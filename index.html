@@ -251,6 +251,56 @@
   .shop-row.checked .sc-qty{ color: rgba(246,240,223,0.6); }
   .shop-empty{ text-align:center; color:#6b6152; font-size:13.5px; padding: 30px 14px; }
 
+  /* swipeable rows */
+  .shop-row{ position:relative; touch-action: pan-y; user-select:none; }
+  .shop-row.dragging{ transition:none; }
+  .shop-row.snap{ transition: transform .22s ease; }
+
+  /* note indicator on Piano items */
+  .note-dot{
+    width:8px; height:8px; border-radius:50%; background: var(--rust); flex:0 0 auto; margin-right:2px;
+  }
+
+  /* extra (custom) shopping items */
+  .shop-row.extra{
+    background: #FBEFD9; border: 1px solid #E4C57A; border-left: 4px solid var(--mustard);
+  }
+  .shop-row.extra.checked{ background: var(--pine); border-color: var(--pine); }
+  .shop-row.extra .sc-name::after{
+    content:'extra'; font-family:'IBM Plex Mono',monospace; font-size:9.5px; font-weight:600;
+    color: var(--mustard-ink); background: rgba(217,166,46,0.25); border-radius:5px;
+    padding: 1px 6px; margin-left:8px; vertical-align:middle; letter-spacing:0.03em;
+  }
+  .shop-row.extra.checked .sc-name::after{ color: var(--mustard); background: rgba(217,166,46,0.2); }
+
+  /* add-item row */
+  .shop-add-row{
+    display:flex; align-items:center; justify-content:center; gap:8px; width:100%;
+    padding: 14px; border-radius:16px; background:transparent; border:1.5px dashed var(--sage);
+    color: var(--pine); font-family:'Work Sans',sans-serif; font-weight:600; font-size:14.5px;
+  }
+  .shop-add-row .plus{ font-family:'Fraunces',serif; font-size:19px; line-height:1; }
+
+  /* excluded / muted section */
+  .shop-excluded-label{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.05em; color:#a39a86;
+    text-transform:uppercase; margin: 22px 4px 8px;
+  }
+  .shop-row.excluded{ opacity: 0.4; }
+  .shop-row.excluded .sc-name::after{
+    content:'escluso · swipe →'; font-family:'IBM Plex Mono',monospace; font-size:9.5px; font-weight:600;
+    color:#8a8062; margin-left:8px; letter-spacing:0.02em;
+  }
+
+  /* add item sheet input */
+  .additem-input{
+    width:100%; box-sizing:border-box; font-family:'Work Sans',sans-serif; font-size:15px;
+    padding: 11px 14px; border-radius:11px; border:1px solid var(--line); background:var(--paper);
+    color: var(--ink); margin-top:8px;
+  }
+  .additem-input:focus{ outline:2px solid var(--mustard); }
+
+
   /* search sheet */
   .search-input{
     width:100%; box-sizing:border-box; font-family:'Work Sans',sans-serif; font-size:15px;
@@ -282,7 +332,26 @@
   .sheet h4{ font-family:'Fraunces',serif; font-size:19px; margin:0 0 4px; }
   .sheet .sheet-sub{ font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--rust); margin-bottom:12px;}
   .sheet p{ font-size:14.5px; line-height:1.5; color:#3c3928; margin:0; }
-  .sheet .close-row{ text-align:center; margin-top:18px;}
+  .note-block{ margin-top:16px; padding-top:14px; border-top:1px dashed var(--line); }
+  .note-label{ display:block; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.03em; color:#8a8062; margin-bottom:6px; }
+  .note-input{
+    width:100%; box-sizing:border-box; font-family:'Work Sans',sans-serif; font-size:14.5px;
+    padding:10px 12px; border-radius:11px; border:1px solid var(--line); background:var(--paper);
+    color:var(--ink); resize:vertical;
+  }
+  .note-input:focus{ outline:2px solid var(--mustard); }
+  .note-actions{ display:flex; gap:8px; margin-top:8px; }
+  .note-save{
+    flex:1; font-family:'Work Sans',sans-serif; font-weight:600; font-size:13px; color:var(--paper);
+    background: var(--pine); border:none; border-radius:999px; padding:9px 14px;
+  }
+  .note-delete{
+    font-family:'Work Sans',sans-serif; font-weight:600; font-size:13px; color:var(--rust-2);
+    background:none; border:1px solid var(--rust-2); border-radius:999px; padding:9px 14px;
+  }
+  .note-hint{ font-size:11px; color:#a39a86; margin-top:8px; }
+  .sheet .close-row{ text-align:center; margin-top:18px; display:flex; gap:10px; justify-content:center; }
+  .sheet .close-row .close-btn{ flex:0 1 auto; }
   .sheet .close-btn{
     font-family:'Work Sans',sans-serif; font-weight:600; font-size:13.5px;
     background: var(--pine); color:var(--paper); border:none; padding:10px 22px; border-radius:999px;
@@ -329,6 +398,15 @@
     <h4 id="tipTitle"></h4>
     <div class="sheet-sub" id="tipSub"></div>
     <p id="tipBody"></p>
+    <div class="note-block">
+      <label class="note-label" for="noteInput">La vostra nota su questo alimento</label>
+      <textarea id="noteInput" class="note-input" rows="3" placeholder="Es. non ci è piaciuto, provare senza aglio, raddoppiare la dose…"></textarea>
+      <div class="note-actions">
+        <button class="note-delete" id="noteDeleteBtn" style="display:none;">Elimina nota</button>
+        <button class="note-save" id="noteSaveBtn">Salva nota</button>
+      </div>
+      <div class="note-hint">Resta collegata a questo alimento anche nei prossimi piani.</div>
+    </div>
     <div class="close-row"><button class="close-btn" data-close>Chiudi</button></div>
   </div>
 </div>
@@ -362,6 +440,18 @@
     <input type="text" id="searchInput" class="search-input" placeholder="Es. gamberi, kiwi, riso venere…" autocomplete="off">
     <div id="searchResults" class="search-results"></div>
     <div class="close-row"><button class="close-btn" data-close>Chiudi</button></div>
+  </div>
+</div>
+
+<div class="sheet-backdrop" id="addItemBackdrop">
+  <div class="sheet">
+    <h4>Aggiungi alla lista</h4>
+    <div class="sheet-sub">SOLO PER QUESTA SETTIMANA</div>
+    <input type="text" id="addItemInput" class="additem-input" placeholder="Es. detersivo per piatti…" autocomplete="off">
+    <div class="close-row">
+      <button class="close-btn" data-close>Annulla</button>
+      <button class="note-save" id="addItemConfirm" style="max-width:160px;">Aggiungi</button>
+    </div>
   </div>
 </div>
 
@@ -407,41 +497,60 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
 
   let state = { week: 'w1', day: DAY_ORDER[0], view: 'piano' };
   let checkedState = {};
+  let notesState = {};
+  let excludedState = {};
+  let extraState = {};
   let useFirebase = false;
-  let fbSpesaRef = null;
+  let fbRoot = null;
 
   try{
     if(window.firebase){
       firebase.initializeApp(FIREBASE_CONFIG);
-      fbSpesaRef = firebase.database().ref('spesa');
+      fbRoot = firebase.database().ref();
       useFirebase = true;
     }
   }catch(e){ useFirebase = false; }
 
-  function loadCheckedLocal(){
-    try{
-      const raw = localStorage.getItem('spesa-checked-v1');
-      return raw ? JSON.parse(raw) : {};
-    }catch(e){ return {}; }
-  }
-  function saveCheckedLocal(){
-    try{ localStorage.setItem('spesa-checked-v1', JSON.stringify(checkedState)); }catch(e){}
+  function normName(name){
+    return (name || '').trim().toLowerCase();
   }
 
-  function initChecked(){
+  // --- generic local-storage fallback helpers (used only if Firebase is unreachable) ---
+  function loadLocal(key, fallback){
+    try{ const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; }
+    catch(e){ return fallback; }
+  }
+  function saveLocal(key, value){
+    try{ localStorage.setItem(key, JSON.stringify(value)); }catch(e){}
+  }
+
+  function initSync(){
     if(useFirebase){
-      fbSpesaRef.on('value', snap => {
+      fbRoot.child('spesa').on('value', snap=>{
         checkedState = snap.val() || {};
         if(state.view === 'spesa') renderMain();
-      }, err => {
-        // fall back to local-only if permissions/network fail
-        useFirebase = false;
-        checkedState = loadCheckedLocal();
+      }, ()=>{ useFirebase = false; initLocalFallback(); });
+      fbRoot.child('note').on('value', snap=>{
+        notesState = snap.val() || {};
+        if(state.view === 'piano') renderMain();
+      });
+      fbRoot.child('excluded').on('value', snap=>{
+        excludedState = snap.val() || {};
+        if(state.view === 'spesa') renderMain();
+      });
+      fbRoot.child('spesa_extra').on('value', snap=>{
+        extraState = snap.val() || {};
         if(state.view === 'spesa') renderMain();
       });
     } else {
-      checkedState = loadCheckedLocal();
+      initLocalFallback();
     }
+  }
+  function initLocalFallback(){
+    checkedState = loadLocal('spesa-checked-v1', {});
+    notesState = loadLocal('note-v1', {});
+    excludedState = loadLocal('excluded-v1', {});
+    extraState = loadLocal('extra-v1', {});
   }
 
   function isChecked(wk, cat, name){
@@ -451,25 +560,83 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
     const key = cat + '::' + name;
     const currentlyChecked = isChecked(wk, cat, name);
     if(useFirebase){
-      const path = fbSpesaRef.child(wk).child(key);
+      const path = fbRoot.child('spesa').child(wk).child(key);
       if(currentlyChecked) path.remove(); else path.set(true);
-      // local state updates via the live 'value' listener above
     } else {
       checkedState[wk] = checkedState[wk] || {};
       if(currentlyChecked) delete checkedState[wk][key];
       else checkedState[wk][key] = true;
-      saveCheckedLocal();
+      saveLocal('spesa-checked-v1', checkedState);
       if(state.view === 'spesa') renderMain();
     }
   }
   function resetAllChecked(){
     if(!confirm('Svuotare tutte le spunte della spesa, in tutte le settimane? Vale per entrambi i telefoni.')) return;
     if(useFirebase){
-      fbSpesaRef.remove();
+      fbRoot.child('spesa').remove();
     } else {
       checkedState = {};
-      saveCheckedLocal();
+      saveLocal('spesa-checked-v1', checkedState);
       renderMain();
+    }
+  }
+
+  // --- notes (keyed by food name, shared across weeks and future diet plans) ---
+  function getNote(name){
+    const n = notesState[normName(name)];
+    return n && n.text ? n.text : '';
+  }
+  function saveNote(name, text){
+    const key = normName(name);
+    text = text.trim();
+    if(useFirebase){
+      if(text) fbRoot.child('note').child(key).set({ text, updatedAt: Date.now() });
+      else fbRoot.child('note').child(key).remove();
+    } else {
+      if(text) notesState[key] = { text, updatedAt: Date.now() };
+      else delete notesState[key];
+      saveLocal('note-v1', notesState);
+      if(state.view === 'piano') renderMain();
+    }
+  }
+
+  // --- excluded items (global, food never bought — applies to all weeks) ---
+  function isExcluded(name){
+    return !!excludedState[normName(name)];
+  }
+  function setExcluded(name, val){
+    const key = normName(name);
+    if(useFirebase){
+      if(val) fbRoot.child('excluded').child(key).set(true);
+      else fbRoot.child('excluded').child(key).remove();
+    } else {
+      if(val) excludedState[key] = true; else delete excludedState[key];
+      saveLocal('excluded-v1', excludedState);
+      if(state.view === 'spesa') renderMain();
+    }
+  }
+
+  // --- extra custom items (per current week only) ---
+  function addExtraItem(wk, text){
+    text = text.trim();
+    if(!text) return;
+    const id = 'x' + Date.now() + Math.random().toString(36).slice(2,7);
+    if(useFirebase){
+      fbRoot.child('spesa_extra').child(wk).child(id).set({ name: text, createdAt: Date.now() });
+    } else {
+      extraState[wk] = extraState[wk] || {};
+      extraState[wk][id] = { name: text, createdAt: Date.now() };
+      saveLocal('extra-v1', extraState);
+      if(state.view === 'spesa') renderMain();
+    }
+  }
+  function removeExtraItem(wk, id){
+    if(useFirebase){
+      fbRoot.child('spesa_extra').child(wk).child(id).remove();
+    } else {
+      if(extraState[wk]) delete extraState[wk][id];
+      saveLocal('extra-v1', extraState);
+      if(state.view === 'spesa') renderMain();
     }
   }
 
@@ -535,30 +702,36 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
   function itemRow(item){
     const cad = item.cad;
     const tip = DIET_DATA.tips[cad];
-    const hasInfo = tip && cad;
-    return `<div class="item-row" ${hasInfo ? `data-cad="${cad}" data-name="${escapeHtml(item.name)}"` : ''}>
+    const hasInfo = !!(tip && cad);
+    const hasNote = !!getNote(item.name);
+    return `<div class="item-row" data-cad="${cad||''}" data-name="${escapeHtml(item.name)}">
+      ${hasNote ? `<span class="note-dot" title="Ha una nota"></span>` : ''}
       <div class="item-name">${escapeHtml(item.name)}</div>
       ${item.qty ? `<span class="qty-tag">${escapeHtml(item.qty)}</span>` : ''}
       ${gramTag(item)}
-      ${hasInfo ? `<span class="info-icon">i</span>` : ''}
+      <span class="info-icon">${hasInfo ? 'i' : '✎'}</span>
     </div>`;
   }
 
   function dishBlock(item, idx){
     const subsHtml = item.sub.map((s, si)=>{
       const isEst = !!s.estimate;
-      const attrs = isEst ? `data-estimate="1" data-name="${escapeHtml(s.name)}"` : '';
-      return `<div class="sub-row" ${attrs}>
+      const hasNote = !!getNote(s.name);
+      return `<div class="sub-row" data-estimate="${isEst ? '1':''}" data-name="${escapeHtml(s.name)}">
+        ${hasNote ? `<span class="note-dot" title="Ha una nota"></span>` : ''}
         <span class="sub-name">${escapeHtml(s.name)}</span>
         ${s.qty ? `<span class="qty-tag">${escapeHtml(s.qty)}</span>` : ''}
         ${gramTag(s)}
-        ${isEst ? `<span class="info-icon">i</span>` : ''}
+        <span class="info-icon" style="width:18px;height:18px;font-size:10.5px;">${isEst ? 'i' : '✎'}</span>
       </div>`;
     }).join('');
     const tip = DIET_DATA.tips[item.cad];
+    const dishHasNote = !!getNote(item.name);
     return `<div class="dish" id="dish-${idx}">
       <div class="dish-head" data-toggle="dish-${idx}">
-        <span class="dish-name">${escapeHtml(item.name)}</span>
+        <span class="dish-name" data-name="${escapeHtml(item.name)}">
+          ${dishHasNote ? `<span class="note-dot" title="Ha una nota"></span>` : ''}${escapeHtml(item.name)}
+        </span>
         <span class="caret">▶</span>
       </div>
       <div class="dish-subs">
@@ -611,32 +784,98 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
         document.getElementById(head.dataset.toggle).classList.toggle('open');
       });
     });
-    main.querySelectorAll('.item-row[data-cad]').forEach(row=>{
+    main.querySelectorAll('.item-row[data-name]').forEach(row=>{
       row.addEventListener('click', ()=>{
-        openTip(row.dataset.cad, row.dataset.name);
+        openItemDetail(row.dataset.name, row.dataset.cad, false);
       });
     });
-    main.querySelectorAll('.sub-row[data-estimate]').forEach(row=>{
+    main.querySelectorAll('.sub-row[data-name]').forEach(row=>{
       row.addEventListener('click', ()=>{
-        openEstimateTip(row.dataset.name);
+        openItemDetail(row.dataset.name, '', row.dataset.estimate === '1');
+      });
+    });
+    main.querySelectorAll('.dish-name[data-name]').forEach(el=>{
+      el.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        openItemDetail(el.dataset.name, '', false);
       });
     });
   }
 
-  function openTip(cad, name){
-    const title = DIET_DATA.titles[cad] || name;
-    const tip = DIET_DATA.tips[cad] || '';
+  let currentDetailName = null;
+
+  function openItemDetail(name, cad, isEstimate){
+    currentDetailName = name;
+    const tip = cad ? DIET_DATA.tips[cad] : '';
+    const title = cad ? DIET_DATA.titles[cad] : null;
+
     document.getElementById('tipTitle').textContent = titleCase(name);
-    document.getElementById('tipSub').textContent = title !== name.toUpperCase() ? title : ('CAD ' + cad);
-    document.getElementById('tipBody').textContent = tip;
+
+    if(isEstimate){
+      document.getElementById('tipSub').textContent = 'STIMA · QUANTITÀ BASTANTE';
+      document.getElementById('tipBody').textContent = DIET_DATA.bastante_note || '';
+      document.getElementById('tipBody').style.display = '';
+    } else if(tip){
+      document.getElementById('tipSub').textContent = (title && title !== name.toUpperCase()) ? title : ('CAD ' + cad);
+      document.getElementById('tipBody').textContent = tip;
+      document.getElementById('tipBody').style.display = '';
+    } else {
+      document.getElementById('tipSub').textContent = '';
+      document.getElementById('tipBody').style.display = 'none';
+    }
+
+    const existingNote = getNote(name);
+    const noteInput = document.getElementById('noteInput');
+    noteInput.value = existingNote;
+    document.getElementById('noteDeleteBtn').style.display = existingNote ? '' : 'none';
+
     document.getElementById('tipBackdrop').classList.add('show');
   }
 
-  function openEstimateTip(name){
-    document.getElementById('tipTitle').textContent = titleCase(name);
-    document.getElementById('tipSub').textContent = 'STIMA · QUANTITÀ BASTANTE';
-    document.getElementById('tipBody').textContent = DIET_DATA.bastante_note || '';
-    document.getElementById('tipBackdrop').classList.add('show');
+  function attachSwipe(el, opts){
+    let startX=0, startY=0, dx=0, dragging=false, decided=false, horizontal=false;
+    const threshold = opts.threshold || 70;
+    el.addEventListener('touchstart', e=>{
+      const t = e.touches[0];
+      startX = t.clientX; startY = t.clientY; dx = 0; dragging = true; decided = false; horizontal = false;
+      el.classList.add('dragging'); el.classList.remove('snap');
+    }, {passive:true});
+    el.addEventListener('touchmove', e=>{
+      if(!dragging) return;
+      const t = e.touches[0];
+      dx = t.clientX - startX;
+      const dy = t.clientY - startY;
+      if(!decided && (Math.abs(dx) > 8 || Math.abs(dy) > 8)){
+        decided = true;
+        horizontal = Math.abs(dx) > Math.abs(dy);
+      }
+      if(horizontal){
+        e.preventDefault();
+        let d = dx;
+        if(opts.onCommitLeft && !opts.onCommitRight) d = Math.min(0, d);
+        if(opts.onCommitRight && !opts.onCommitLeft) d = Math.max(0, d);
+        el.style.transform = `translateX(${d}px)`;
+        el.style.opacity = String(Math.max(0.35, 1 - Math.abs(d)/280));
+      }
+    }, {passive:false});
+    el.addEventListener('touchend', ()=>{
+      dragging = false;
+      el.classList.remove('dragging'); el.classList.add('snap');
+      if(horizontal && Math.abs(dx) > threshold){
+        if(dx < 0 && opts.onCommitLeft){
+          el.style.transform = 'translateX(-110%)'; el.style.opacity = '0';
+          setTimeout(opts.onCommitLeft, 160);
+          return;
+        }
+        if(dx > 0 && opts.onCommitRight){
+          el.style.transform = 'translateX(110%)'; el.style.opacity = '0';
+          setTimeout(opts.onCommitRight, 160);
+          return;
+        }
+      }
+      el.style.transform = '';
+      el.style.opacity = '';
+    }, {passive:true});
   }
 
   function renderShopping(){
@@ -645,32 +884,57 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
     const weekIdx = WEEK_KEYS.indexOf(state.week) + 1;
 
     // flatten into one ordered list (order = the supermarket path), no visible category labels
-    const flat = [];
-    sections.forEach(sec=> sec.items.forEach(it=> flat.push({cat: sec.category, name: it.name, qty: it.qty})));
+    const allFlat = [];
+    sections.forEach(sec=> sec.items.forEach(it=> allFlat.push({cat: sec.category, name: it.name, qty: it.qty})));
+
+    const mainFlat = allFlat.filter(it => !isExcluded(it.name));
+    const excludedFlat = allFlat.filter(it => isExcluded(it.name));
+
+    const weekExtras = extraState[state.week] || {};
+    const extraList = Object.keys(weekExtras).map(id => ({ id, name: weekExtras[id].name }));
 
     let checkedCount = 0;
-    flat.forEach(it=>{ if(isChecked(state.week, it.cat, it.name)) checkedCount++; });
+    mainFlat.forEach(it=>{ if(isChecked(state.week, it.cat, it.name)) checkedCount++; });
+    extraList.forEach(it=>{ if(isChecked(state.week, 'extra', it.name)) checkedCount++; });
+    const totalCount = mainFlat.length + extraList.length;
 
     let html = `<div class="day-heading">
       <h2>Lista spesa</h2>
       <span class="badge-train" style="border-color:var(--sage); color:var(--sage);">Settimana ${weekIdx}</span>
     </div>
     <div class="shop-toolbar">
-      <span class="shop-progress"><strong>${checkedCount}</strong> / ${flat.length} presi</span>
+      <span class="shop-progress"><strong>${checkedCount}</strong> / ${totalCount} presi</span>
       <button class="shop-reset" id="resetChecksBtn">Svuota tutte le spunte</button>
     </div>`;
 
-    if(flat.length === 0){
-      html += `<div class="shop-empty">Nessun dato per questa settimana.</div>`;
+    if(mainFlat.length === 0 && extraList.length === 0){
+      html += `<div class="shop-empty">Nessun alimento in questa settimana.</div>`;
     } else {
       html += `<div class="shop-list">`;
-      flat.forEach(it=>{
+      mainFlat.forEach(it=>{
         const checked = isChecked(state.week, it.cat, it.name);
-        html += `<button class="shop-row${checked ? ' checked' : ''}" data-cat="${escapeHtml(it.cat)}" data-name="${escapeHtml(it.name)}">
+        html += `<button class="shop-row${checked ? ' checked' : ''}" data-type="diet" data-cat="${escapeHtml(it.cat)}" data-name="${escapeHtml(it.name)}">
           <span class="sc-text">
             <span class="sc-name">${escapeHtml(it.name)}</span>
             <span class="sc-qty">${escapeHtml(it.qty)}</span>
           </span>
+        </button>`;
+      });
+      extraList.forEach(it=>{
+        const checked = isChecked(state.week, 'extra', it.name);
+        html += `<button class="shop-row extra${checked ? ' checked' : ''}" data-type="extra" data-id="${it.id}" data-name="${escapeHtml(it.name)}">
+          <span class="sc-text"><span class="sc-name">${escapeHtml(it.name)}</span></span>
+        </button>`;
+      });
+      html += `<button class="shop-add-row" id="openAddItem"><span class="plus">+</span> Aggiungi alla lista</button>`;
+      html += `</div>`;
+    }
+
+    if(excludedFlat.length){
+      html += `<div class="shop-excluded-label">Non li comprate più</div><div class="shop-list">`;
+      excludedFlat.forEach(it=>{
+        html += `<button class="shop-row excluded" data-type="excluded" data-name="${escapeHtml(it.name)}">
+          <span class="sc-text"><span class="sc-name">${escapeHtml(it.name)}</span></span>
         </button>`;
       });
       html += `</div>`;
@@ -678,11 +942,24 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
 
     main.innerHTML = html;
 
-    main.querySelectorAll('.shop-row').forEach(row=>{
-      row.addEventListener('click', ()=>{
-        toggleChecked(state.week, row.dataset.cat, row.dataset.name);
-      });
+    main.querySelectorAll('.shop-row[data-type="diet"]').forEach(row=>{
+      row.addEventListener('click', ()=> toggleChecked(state.week, row.dataset.cat, row.dataset.name));
+      attachSwipe(row, { onCommitLeft: ()=> setExcluded(row.dataset.name, true) });
     });
+    main.querySelectorAll('.shop-row[data-type="extra"]').forEach(row=>{
+      row.addEventListener('click', ()=> toggleChecked(state.week, 'extra', row.dataset.name));
+      attachSwipe(row, { onCommitLeft: ()=> removeExtraItem(state.week, row.dataset.id) });
+    });
+    main.querySelectorAll('.shop-row[data-type="excluded"]').forEach(row=>{
+      attachSwipe(row, { onCommitRight: ()=> setExcluded(row.dataset.name, false) });
+    });
+
+    const addBtn = document.getElementById('openAddItem');
+    if(addBtn) addBtn.addEventListener('click', ()=>{
+      document.getElementById('addItemBackdrop').classList.add('show');
+      setTimeout(()=>document.getElementById('addItemInput').focus(), 250);
+    });
+
     const resetBtn = document.getElementById('resetChecksBtn');
     if(resetBtn) resetBtn.addEventListener('click', resetAllChecked);
   }
@@ -751,10 +1028,11 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
   }
 
   document.addEventListener('click', (e)=>{
-    if(e.target.matches('[data-close]') || e.target.id === 'tipBackdrop' || e.target.id === 'rulesBackdrop' || e.target.id === 'searchBackdrop'){
+    if(e.target.matches('[data-close]') || e.target.id === 'tipBackdrop' || e.target.id === 'rulesBackdrop' || e.target.id === 'searchBackdrop' || e.target.id === 'addItemBackdrop'){
       document.getElementById('tipBackdrop').classList.remove('show');
       document.getElementById('rulesBackdrop').classList.remove('show');
       document.getElementById('searchBackdrop').classList.remove('show');
+      document.getElementById('addItemBackdrop').classList.remove('show');
     }
   });
   document.getElementById('rulesBtn').addEventListener('click', ()=>{
@@ -768,11 +1046,32 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
   document.getElementById('searchInput').addEventListener('input', (e)=>{
     renderSearchResults(e.target.value);
   });
+  document.getElementById('noteSaveBtn').addEventListener('click', ()=>{
+    if(!currentDetailName) return;
+    saveNote(currentDetailName, document.getElementById('noteInput').value);
+    document.getElementById('tipBackdrop').classList.remove('show');
+  });
+  document.getElementById('noteDeleteBtn').addEventListener('click', ()=>{
+    if(!currentDetailName) return;
+    saveNote(currentDetailName, '');
+    document.getElementById('tipBackdrop').classList.remove('show');
+  });
+  document.getElementById('addItemConfirm').addEventListener('click', ()=>{
+    const input = document.getElementById('addItemInput');
+    if(input.value.trim()){
+      addExtraItem(state.week, input.value);
+      input.value = '';
+    }
+    document.getElementById('addItemBackdrop').classList.remove('show');
+  });
+  document.getElementById('addItemInput').addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter') document.getElementById('addItemConfirm').click();
+  });
 
   renderViewSwitch();
   renderWeekbar();
   renderDaybar();
-  initChecked();
+  initSync();
   renderMain();
 })();
 
