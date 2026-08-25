@@ -286,14 +286,11 @@
   /* floating add button */
   .fab-add{
     position:fixed; right:18px; bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-    width:58px; height:58px; border-radius:50%; background:#2E7D4F; border:none;
+    width:58px; height:58px; border-radius:50%; background: var(--pine); border:none;
     box-shadow: 0 10px 22px rgba(20,40,25,0.35); z-index:30; display:none;
-    align-items:center; justify-content:center;
+    align-items:center; justify-content:center; color: var(--mustard);
   }
   .fab-add:active{ transform: scale(0.94); }
-  .fab-add::before{
-    content:'+'; font-family:'Fraunces',serif; font-size:30px; line-height:1; color: var(--mustard);
-  }
 
   /* excluded / muted section */
   .shop-excluded-label{
@@ -400,7 +397,9 @@
 
 <main id="main"></main>
 
-<button class="fab-add" id="fabAdd" aria-label="Aggiungi alla lista">+</button>
+<button class="fab-add" id="fabAdd" aria-label="Aggiungi alla lista">
+  <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round"><path d="M12 4v16M4 12h16"/></svg>
+</button>
 
 <div class="sheet-backdrop" id="tipBackdrop">
   <div class="sheet" id="tipSheet">
