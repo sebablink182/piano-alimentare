@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Il Piano di Ale</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -30,7 +30,7 @@
     --shadow: 0 1px 0 rgba(38,48,31,0.06);
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
-  html,body{margin:0;padding:0;}
+  html,body{margin:0;padding:0; touch-action: manipulation; -webkit-text-size-adjust: 100%; text-size-adjust: 100%;}
   body{
     background: var(--paper);
     color: var(--ink);
@@ -1090,6 +1090,19 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
     document.getElementById('addItemBackdrop').classList.add('show');
     setTimeout(()=>document.getElementById('addItemInput').focus(), 250);
   });
+
+  // block pinch-zoom and double-tap-zoom, iOS sometimes allows these even with the viewport meta locked
+  document.addEventListener('gesturestart', e => e.preventDefault());
+  document.addEventListener('gesturechange', e => e.preventDefault());
+  let lastTouchEnd = 0;
+  document.addEventListener('touchend', e => {
+    const now = Date.now();
+    if(now - lastTouchEnd <= 300) e.preventDefault();
+    lastTouchEnd = now;
+  }, { passive: false });
+  document.addEventListener('touchmove', e => {
+    if(e.touches && e.touches.length > 1) e.preventDefault();
+  }, { passive: false });
 
   renderViewSwitch();
   renderWeekbar();
