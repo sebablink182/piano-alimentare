@@ -36,7 +36,7 @@
     color: var(--ink);
     font-family:'Work Sans', -apple-system, sans-serif;
     min-height:100vh;
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 56px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   @media (prefers-reduced-motion: reduce){
     *{ animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
@@ -273,13 +273,27 @@
   }
   .shop-row.extra.checked .sc-name::after{ color: var(--mustard); background: rgba(217,166,46,0.2); }
 
-  /* add-item row */
-  .shop-add-row{
-    display:flex; align-items:center; justify-content:center; gap:8px; width:100%;
-    padding: 14px; border-radius:16px; background:transparent; border:1.5px dashed var(--sage);
-    color: var(--pine); font-family:'Work Sans',sans-serif; font-weight:600; font-size:14.5px;
+  /* swipe reveal background (Gmail-style) */
+  .swipe-wrap{ position:relative; border-radius:16px; overflow:hidden; }
+  .swipe-bg{
+    position:absolute; inset:0; display:flex; align-items:center;
+    font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:13px; letter-spacing:0.08em;
+    color:#fff; opacity:0; pointer-events:none;
   }
-  .shop-add-row .plus{ font-family:'Fraunces',serif; font-size:19px; line-height:1; }
+  .swipe-bg.left{ background:#C0392B; justify-content:flex-end; padding-right:26px; }
+  .swipe-bg.right{ background:#2E7D4F; justify-content:flex-start; padding-left:26px; }
+
+  /* floating add button */
+  .fab-add{
+    position:fixed; right:18px; bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    width:58px; height:58px; border-radius:50%; background:#2E7D4F; border:none;
+    box-shadow: 0 10px 22px rgba(20,40,25,0.35); z-index:30; display:none;
+    align-items:center; justify-content:center;
+  }
+  .fab-add:active{ transform: scale(0.94); }
+  .fab-add::before{
+    content:'+'; font-family:'Fraunces',serif; font-size:30px; line-height:1; color: var(--mustard);
+  }
 
   /* excluded / muted section */
   .shop-excluded-label{
@@ -325,7 +339,7 @@
   .sheet-backdrop.show{ display:flex; }
   .sheet{
     background: var(--paper); width:100%; max-width:640px; border-radius: 20px 20px 0 0;
-    padding: 18px 20px calc(64px + env(safe-area-inset-bottom, 0px)); max-height:78vh; overflow-y:auto;
+    padding: 18px 20px calc(26px + env(safe-area-inset-bottom, 0px)); max-height:78vh; overflow-y:auto;
     animation: rise .22s ease;
   }
   @keyframes rise{ from{ transform: translateY(24px); opacity:0;} to{ transform:translateY(0); opacity:1;} }
@@ -361,11 +375,6 @@
   .rules-modal h5{ font-family:'Fraunces',serif; font-size:14.5px; margin: 14px 0 4px; color:var(--rust-2);}
   .rules-modal p{ margin-bottom:2px; }
   .rules-modal ul{ margin:4px 0 0; padding-left:18px; font-size:14px; line-height:1.5; color:#3c3928;}
-
-  footer.credit{
-    text-align:center; font-size:11px; color:#8a8062; padding: 10px 20px 28px;
-    font-family:'IBM Plex Mono',monospace; letter-spacing:0.02em;
-  }
 </style>
 </head>
 <body>
@@ -391,7 +400,7 @@
 
 <main id="main"></main>
 
-<footer class="credit">CARTELLINO PESI · conversioni stimate dal ricettario CAD</footer>
+<button class="fab-add" id="fabAdd" aria-label="Aggiungi alla lista">+</button>
 
 <div class="sheet-backdrop" id="tipBackdrop">
   <div class="sheet" id="tipSheet">
@@ -695,6 +704,8 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
   }
 
   function renderMain(){
+    const fab = document.getElementById('fabAdd');
+    if(fab) fab.style.display = state.view === 'spesa' ? 'flex' : 'none';
     if(state.view === 'spesa') renderShopping();
     else renderDay();
   }
@@ -835,6 +846,10 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
   function attachSwipe(el, opts){
     let startX=0, startY=0, dx=0, dragging=false, decided=false, horizontal=false;
     const threshold = opts.threshold || 70;
+    const wrap = el.closest('.swipe-wrap');
+    const bgLeft = wrap ? wrap.querySelector('.swipe-bg.left') : null;
+    const bgRight = wrap ? wrap.querySelector('.swipe-bg.right') : null;
+
     el.addEventListener('touchstart', e=>{
       const t = e.touches[0];
       startX = t.clientX; startY = t.clientY; dx = 0; dragging = true; decided = false; horizontal = false;
@@ -855,7 +870,9 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
         if(opts.onCommitLeft && !opts.onCommitRight) d = Math.min(0, d);
         if(opts.onCommitRight && !opts.onCommitLeft) d = Math.max(0, d);
         el.style.transform = `translateX(${d}px)`;
-        el.style.opacity = String(Math.max(0.35, 1 - Math.abs(d)/280));
+        const progress = Math.min(1, Math.abs(d) / threshold);
+        if(d < 0 && bgLeft) bgLeft.style.opacity = progress;
+        if(d > 0 && bgRight) bgRight.style.opacity = progress;
       }
     }, {passive:false});
     el.addEventListener('touchend', ()=>{
@@ -863,18 +880,19 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
       el.classList.remove('dragging'); el.classList.add('snap');
       if(horizontal && Math.abs(dx) > threshold){
         if(dx < 0 && opts.onCommitLeft){
-          el.style.transform = 'translateX(-110%)'; el.style.opacity = '0';
+          el.style.transform = 'translateX(-110%)';
           setTimeout(opts.onCommitLeft, 160);
           return;
         }
         if(dx > 0 && opts.onCommitRight){
-          el.style.transform = 'translateX(110%)'; el.style.opacity = '0';
+          el.style.transform = 'translateX(110%)';
           setTimeout(opts.onCommitRight, 160);
           return;
         }
       }
       el.style.transform = '';
-      el.style.opacity = '';
+      if(bgLeft) bgLeft.style.opacity = 0;
+      if(bgRight) bgRight.style.opacity = 0;
     }, {passive:true});
   }
 
@@ -913,29 +931,37 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
       html += `<div class="shop-list">`;
       mainFlat.forEach(it=>{
         const checked = isChecked(state.week, it.cat, it.name);
-        html += `<button class="shop-row${checked ? ' checked' : ''}" data-type="diet" data-cat="${escapeHtml(it.cat)}" data-name="${escapeHtml(it.name)}">
-          <span class="sc-text">
-            <span class="sc-name">${escapeHtml(it.name)}</span>
-            <span class="sc-qty">${escapeHtml(it.qty)}</span>
-          </span>
-        </button>`;
+        html += `<div class="swipe-wrap">
+          <div class="swipe-bg left">RIMUOVI</div>
+          <button class="shop-row${checked ? ' checked' : ''}" data-type="diet" data-cat="${escapeHtml(it.cat)}" data-name="${escapeHtml(it.name)}">
+            <span class="sc-text">
+              <span class="sc-name">${escapeHtml(it.name)}</span>
+              <span class="sc-qty">${escapeHtml(it.qty)}</span>
+            </span>
+          </button>
+        </div>`;
       });
       extraList.forEach(it=>{
         const checked = isChecked(state.week, 'extra', it.name);
-        html += `<button class="shop-row extra${checked ? ' checked' : ''}" data-type="extra" data-id="${it.id}" data-name="${escapeHtml(it.name)}">
-          <span class="sc-text"><span class="sc-name">${escapeHtml(it.name)}</span></span>
-        </button>`;
+        html += `<div class="swipe-wrap">
+          <div class="swipe-bg left">RIMUOVI</div>
+          <button class="shop-row extra${checked ? ' checked' : ''}" data-type="extra" data-id="${it.id}" data-name="${escapeHtml(it.name)}">
+            <span class="sc-text"><span class="sc-name">${escapeHtml(it.name)}</span></span>
+          </button>
+        </div>`;
       });
-      html += `<button class="shop-add-row" id="openAddItem"><span class="plus">+</span> Aggiungi alla lista</button>`;
       html += `</div>`;
     }
 
     if(excludedFlat.length){
       html += `<div class="shop-excluded-label">Non li comprate più</div><div class="shop-list">`;
       excludedFlat.forEach(it=>{
-        html += `<button class="shop-row excluded" data-type="excluded" data-name="${escapeHtml(it.name)}">
-          <span class="sc-text"><span class="sc-name">${escapeHtml(it.name)}</span></span>
-        </button>`;
+        html += `<div class="swipe-wrap">
+          <div class="swipe-bg right">AGGIUNGI</div>
+          <button class="shop-row excluded" data-type="excluded" data-name="${escapeHtml(it.name)}">
+            <span class="sc-text"><span class="sc-name">${escapeHtml(it.name)}</span></span>
+          </button>
+        </div>`;
       });
       html += `</div>`;
     }
@@ -952,12 +978,6 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
     });
     main.querySelectorAll('.shop-row[data-type="excluded"]').forEach(row=>{
       attachSwipe(row, { onCommitRight: ()=> setExcluded(row.dataset.name, false) });
-    });
-
-    const addBtn = document.getElementById('openAddItem');
-    if(addBtn) addBtn.addEventListener('click', ()=>{
-      document.getElementById('addItemBackdrop').classList.add('show');
-      setTimeout(()=>document.getElementById('addItemInput').focus(), 250);
     });
 
     const resetBtn = document.getElementById('resetChecksBtn');
@@ -1066,6 +1086,10 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
   });
   document.getElementById('addItemInput').addEventListener('keydown', (e)=>{
     if(e.key === 'Enter') document.getElementById('addItemConfirm').click();
+  });
+  document.getElementById('fabAdd').addEventListener('click', ()=>{
+    document.getElementById('addItemBackdrop').classList.add('show');
+    setTimeout(()=>document.getElementById('addItemInput').focus(), 250);
   });
 
   renderViewSwitch();
