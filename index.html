@@ -125,6 +125,28 @@
   }
   .chip-day.active .d-flag{ color: var(--rust); }
 
+  /* today markers + auto-week */
+  .chip-week .cur-dot{ display:inline-block; width:6px; height:6px; border-radius:50%; background: var(--mustard); margin-right:6px; vertical-align:middle; }
+  .chip-week.active .cur-dot{ background: var(--mustard-ink); }
+  .chip-day{ position:relative; }
+  .chip-day.today{ border-color: var(--mustard); box-shadow: inset 0 0 0 1px var(--mustard); }
+  .chip-day .today-tag{
+    position:absolute; top:-7px; left:50%; transform:translateX(-50%);
+    font-family:'IBM Plex Mono',monospace; font-size:8.5px; font-weight:700; letter-spacing:0.06em;
+    color: var(--mustard-ink); background: var(--mustard); border-radius:999px; padding:1px 6px;
+  }
+  .dh-right{ display:flex; gap:8px; align-items:center; }
+  .goto-today{
+    font-family:'Work Sans',sans-serif; font-weight:600; font-size:12px; color: var(--pine);
+    background: rgba(217,166,46,0.22); border:1px solid var(--mustard); border-radius:999px; padding:5px 11px;
+  }
+  .weekset{ display:flex; gap:8px; margin-top:8px; }
+  .weekset button{
+    flex:1; padding:11px 0; border-radius:12px; border:1px solid var(--line); background:var(--paper);
+    font-family:'Work Sans',sans-serif; font-weight:600; font-size:14px; color: var(--ink);
+  }
+  .weekset button.on{ background: var(--pine); color: var(--paper); border-color: var(--pine); }
+
   main{ position:relative; z-index:1; padding: 16px 14px 30px; max-width: 640px; margin: 0 auto; }
 
   .day-heading{
@@ -437,6 +459,10 @@
     <p>Gli alimenti in questa sezione si distribuiscono liberamente durante il giorno, ma non sono facoltativi.</p>
     <h5>Pasto libero</h5>
     <p>Ricostruire il pasto sull'esempio degli altri giorni dieta — un ottimo esercizio in vista del dopo-dieta.</p>
+    <h5>Settimana in corso</h5>
+    <p>Indica una volta in quale settimana del ciclo siete oggi: l'app poi apre da sola la settimana e il giorno giusti, ogni giorno (dopo la 4 si riparte dalla 1).</p>
+    <div class="weekset" id="weekSetRow"></div>
+    <p id="weekSetNote" style="font-size:12.5px; color:#8a8062; margin-top:8px;"></p>
     <div class="close-row"><button class="close-btn" data-close>Chiudi</button></div>
   </div>
 </div>
@@ -512,6 +538,54 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
   const PLAN_ID = 'p2'; // Ott–Dic 2026: spunte ed extra ripartono da zero, note ed esclusioni restano condivise
   let fbRoot = null;
 
+  // --- settimana/giorno correnti: calcolati dalla data reale a partire da un punto di riferimento ---
+  const ANCHOR_KEY = 'anchor_' + PLAN_ID;
+  const DEFAULT_ANCHOR = { monday: '2026-11-02', week: 4 }; // lunedì 2 nov 2026 = settimana 4 del ciclo
+  let anchor = loadLocal('anchor-' + PLAN_ID, null) || DEFAULT_ANCHOR;
+  const pad2 = n => (n < 10 ? '0' : '') + n;
+
+  function todayInfo(){
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+    const dow = (now.getDay() + 6) % 7; // lunedì = 0
+    const DAY = 86400000;
+    const mondayUTC = Date.UTC(y, m, d) - dow * DAY;
+    const [ay, am, ad] = anchor.monday.split('-').map(Number);
+    const weeks = Math.round((mondayUTC - Date.UTC(ay, am - 1, ad)) / (7 * DAY));
+    const wi = (((anchor.week - 1 + weeks) % 4) + 4) % 4;
+    return { week: 'w' + (wi + 1), day: DAY_ORDER[dow], key: y + '-' + pad2(m + 1) + '-' + pad2(d) };
+  }
+  let lastDayKey = todayInfo().key;
+  { const t0 = todayInfo(); state.week = t0.week; state.day = t0.day; }
+
+  function setAnchorThisWeek(weekNum){
+    const now = new Date();
+    const dow = (now.getDay() + 6) % 7;
+    const mon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow);
+    anchor = { monday: mon.getFullYear() + '-' + pad2(mon.getMonth() + 1) + '-' + pad2(mon.getDate()), week: weekNum };
+    saveLocal('anchor-' + PLAN_ID, anchor);
+    if(useFirebase) fbRoot.child('spesa').child(ANCHOR_KEY).set(anchor);
+  }
+  function goToToday(){
+    const t = todayInfo();
+    state.week = t.week; state.day = t.day; lastDayKey = t.key;
+    renderWeekbar(); renderDaybar(); renderMain();
+  }
+  function checkNewDay(){
+    const t = todayInfo();
+    if(t.key !== lastDayKey) goToToday();
+  }
+  function renderWeekSet(){
+    const t = todayInfo();
+    const cur = Number(t.week.slice(1));
+    document.getElementById('weekSetRow').innerHTML = [1,2,3,4].map(n =>
+      `<button data-wk="${n}" class="${n === cur ? 'on' : ''}">${n}</button>`).join('');
+    document.getElementById('weekSetRow').querySelectorAll('button').forEach(b=>{
+      b.addEventListener('click', ()=>{ setAnchorThisWeek(Number(b.dataset.wk)); goToToday(); renderWeekSet(); });
+    });
+    document.getElementById('weekSetNote').textContent = 'Oggi: settimana ' + cur + ' · ' + DAY_LABEL[t.day][1];
+  }
+
   try{
     if(window.firebase){
       firebase.initializeApp(FIREBASE_CONFIG);
@@ -536,7 +610,13 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
   function initSync(){
     if(useFirebase){
       fbRoot.child('spesa').on('value', snap=>{
-        checkedState = (snap.val() || {})[PLAN_ID] || {};
+        const all = snap.val() || {};
+        checkedState = all[PLAN_ID] || {};
+        const a = all[ANCHOR_KEY];
+        if(a && a.monday && a.week && (a.monday !== anchor.monday || a.week !== anchor.week)){
+          anchor = a; saveLocal('anchor-' + PLAN_ID, anchor);
+          goToToday();
+        } else
         if(state.view === 'spesa') renderMain();
       }, ()=>{ useFirebase = false; initLocalFallback(); });
       fbRoot.child('note').on('value', snap=>{
@@ -680,7 +760,8 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
     const el = document.getElementById('weekbar');
     el.innerHTML = WEEK_KEYS.map((wk,i)=>{
       const active = wk === state.week ? ' active' : '';
-      return `<button class="chip-week${active}" data-week="${wk}">Settimana ${i+1}</button>`;
+      const cur = wk === todayInfo().week ? '<span class="cur-dot"></span>' : '';
+      return `<button class="chip-week${active}" data-week="${wk}">${cur}Settimana ${i+1}</button>`;
     }).join('');
     el.querySelectorAll('.chip-week').forEach(btn=>{
       btn.addEventListener('click', ()=>{ state.week = btn.dataset.week; renderWeekbar(); renderDaybar(); renderMain(); });
@@ -693,7 +774,10 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
       const [short] = DAY_LABEL[d];
       const isTrain = d.includes('allenamento');
       const active = d === state.day ? ' active' : '';
-      return `<button class="chip-day${active}" data-day="${d}">
+      const t = todayInfo();
+      const isToday = d === t.day && state.week === t.week;
+      return `<button class="chip-day${active}${isToday ? ' today' : ''}" data-day="${d}">
+        ${isToday ? '<span class="today-tag">OGGI</span>' : ''}
         <span class="d-name">${short}</span>
         <span class="d-flag">${isTrain ? '● ALL.' : ''}</span>
       </button>`;
@@ -758,9 +842,14 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
     const [, longLabel] = DAY_LABEL[state.day];
     const isTrain = state.day.includes('allenamento');
 
+    const tNow = todayInfo();
+    const notToday = state.week !== tNow.week || state.day !== tNow.day;
     let html = `<div class="day-heading">
       <h2>${longLabel}</h2>
-      ${isTrain ? '<span class="badge-train">Allenamento</span>' : ''}
+      <div class="dh-right">
+        ${isTrain ? '<span class="badge-train">Allenamento</span>' : ''}
+        ${notToday ? '<button class="goto-today" id="gotoToday">Vai a oggi</button>' : ''}
+      </div>
     </div>`;
 
     const mealNames = Object.keys(meals);
@@ -789,6 +878,7 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
     });
 
     main.innerHTML = html;
+    { const g = document.getElementById('gotoToday'); if(g) g.addEventListener('click', goToToday); }
 
     main.querySelectorAll('[data-toggle]').forEach(head=>{
       head.addEventListener('click', ()=>{
@@ -918,7 +1008,10 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
 
     let html = `<div class="day-heading">
       <h2>Lista spesa</h2>
-      <span class="badge-train" style="border-color:var(--sage); color:var(--sage);">Settimana ${weekIdx}</span>
+      <div class="dh-right">
+        <span class="badge-train" style="border-color:var(--sage); color:var(--sage);">Settimana ${weekIdx}</span>
+        ${state.week !== todayInfo().week ? '<button class="goto-today" id="gotoToday">Vai a oggi</button>' : ''}
+      </div>
     </div>
     <div class="shop-toolbar">
       <span class="shop-progress"><strong>${checkedCount}</strong> / ${totalCount} presi</span>
@@ -967,6 +1060,7 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
     }
 
     main.innerHTML = html;
+    { const g = document.getElementById('gotoToday'); if(g) g.addEventListener('click', goToToday); }
 
     main.querySelectorAll('.shop-row[data-type="diet"]').forEach(row=>{
       row.addEventListener('click', ()=> toggleChecked(state.week, row.dataset.cat, row.dataset.name));
@@ -1056,6 +1150,7 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
     }
   });
   document.getElementById('rulesBtn').addEventListener('click', ()=>{
+    renderWeekSet();
     document.getElementById('rulesBackdrop').classList.add('show');
   });
   document.getElementById('searchBtn').addEventListener('click', ()=>{
@@ -1104,6 +1199,11 @@ const DIET_DATA = {"weeks": {"w1": {"lunedi allenamento": {"Colazione": [{"name"
   document.addEventListener('touchmove', e => {
     if(e.touches && e.touches.length > 1) e.preventDefault();
   }, { passive: false });
+
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'visible') checkNewDay(); });
+  window.addEventListener('pageshow', checkNewDay);
+  window.addEventListener('focus', checkNewDay);
+  setInterval(checkNewDay, 60000);
 
   renderViewSwitch();
   renderWeekbar();
